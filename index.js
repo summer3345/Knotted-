@@ -2179,7 +2179,8 @@ let activePopupHandle = null;
                 #${POPUP_ID} * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
                 /* 只清理结绳自己的 SillyTavern 通用弹窗外壳 */
-                dialog.${SCRIPT_ID_PREFIX}-dialog-shell {
+                dialog.${SCRIPT_ID_PREFIX}-dialog-shell,
+                dialog:has(#${POPUP_ID}) {
                     width: min(calc(100vw - 12px), 580px) !important;
                     max-width: min(calc(100vw - 12px), 580px) !important;
                     padding: 0 !important;
@@ -2189,14 +2190,17 @@ let activePopupHandle = null;
                     box-shadow: none !important;
                 }
                 dialog.${SCRIPT_ID_PREFIX}-dialog-shell .popup-body,
-                dialog.${SCRIPT_ID_PREFIX}-dialog-shell .popup-content {
+                dialog.${SCRIPT_ID_PREFIX}-dialog-shell .popup-content,
+                dialog:has(#${POPUP_ID}) .popup-body,
+                dialog:has(#${POPUP_ID}) .popup-content {
                     width: 100% !important;
                     padding-left: 0 !important;
                     padding-right: 0 !important;
                     border: 0 !important;
                     background: transparent !important;
                 }
-                dialog.${SCRIPT_ID_PREFIX}-dialog-shell .popup-button-close {
+                dialog.${SCRIPT_ID_PREFIX}-dialog-shell .popup-button-close,
+                dialog:has(#${POPUP_ID}) .popup-button-close {
                     display: none !important;
                 }
 
@@ -3157,7 +3161,7 @@ let activePopupHandle = null;
             </div>
         `;
         showDisplayPopupCompat(popupHtml, "聊天记录总结工具", {
-            wide: true, large: true, allowVerticalScrolling: true, buttons: [],
+            wide: true, large: true, transparent: true, allowVerticalScrolling: true, buttons: [],
             callback: function(action, popupJqueryObject) { logDebug("Summarizer Popup closed: " + action); $popupInstance = null; }
         });
     
