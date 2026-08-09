@@ -1,0 +1,10 @@
+{
+  "display_name": "结绳 Knotted",
+  "loading_order": 100,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "version": "2.1.0",
+  "homePage": "https://github.com/upcjiangxiaoyi-art"
+}

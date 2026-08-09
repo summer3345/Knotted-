@@ -1,0 +1,762 @@
+/* 结绳（Knotted）面板：基于 summarizer-ui-prototype.html 的移动端视觉。 */
+#chatSummarizerWorldbookAdv-popup {
+    --r-lg: 18px;
+    --r-md: 13px;
+    --r-sm: 9px;
+    --ff-serif: "Noto Serif CJK SC", "Noto Serif SC", "Source Han Serif SC", "Songti SC", "STSong", serif;
+    --ff-sans: -apple-system, "PingFang SC", "HarmonyOS Sans SC", "MiSans", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+    --ff-num: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+    --bg: #171A1F;
+    --surface: #20242B;
+    --surface-2: #272C34;
+    --sunken: #151920;
+    --line: #333A44;
+    --line-soft: #2A303A;
+    --text: #E4E7EA;
+    --dim: #8C949E;
+    --faint: #5F6873;
+    --accent: var(--theme-accent-color, #D096A8);
+    --accent-ink: #241A1E;
+    --accent-soft: rgba(208, 150, 168, 0.15);
+    --ok: #8FB79A;
+    --warn: #D9A05B;
+    --s-fresh: #7FA3B5;
+    --s-g1: #5A6A7C;
+    --s-g2: #454F5F;
+    --s-g3: #363E4B;
+    --shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+    width: 100%;
+    max-width: 430px;
+    margin: 0 auto;
+    padding: 14px 12px 30px;
+    border-radius: var(--r-lg);
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--ff-sans);
+    font-size: 15px;
+    line-height: 1.6;
+    transition: background 0.35s ease, color 0.35s ease;
+}
+
+#chatSummarizerWorldbookAdv-popup.day {
+    --bg: #ECEDE9;
+    --surface: #FFFFFF;
+    --surface-2: #F5F6F3;
+    --sunken: #E4E6E1;
+    --line: #DDE0DA;
+    --line-soft: #E8EAE5;
+    --text: #23282C;
+    --dim: #6E767D;
+    --faint: #9AA2A8;
+    --accent-ink: #FFFFFF;
+    --accent-soft: rgba(167, 107, 128, 0.11);
+    --ok: #5E8A6C;
+    --warn: #A56E27;
+    --s-fresh: #8FB0C0;
+    --s-g1: #7A8B9C;
+    --s-g2: #606C7C;
+    --s-g3: #4B5563;
+    --shadow: 0 6px 22px rgba(40, 50, 60, 0.1);
+}
+
+#chatSummarizerWorldbookAdv-popup,
+#chatSummarizerWorldbookAdv-popup * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#chatSummarizerWorldbookAdv-popup .summarizer-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 4px 4px 16px;
+    text-align: left;
+}
+
+#chatSummarizerWorldbookAdv-popup .summarizer-brand h1 {
+    margin: 0;
+    color: var(--text);
+    font-family: var(--ff-serif);
+    font-size: 21px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+}
+
+#chatSummarizerWorldbookAdv-popup .summarizer-brand p {
+    margin: 3px 0 0;
+    color: var(--faint);
+    font-size: 11.5px;
+    letter-spacing: 0.12em;
+}
+
+#chatSummarizerWorldbookAdv-popup .ui-mode-toggle {
+    display: grid;
+    flex: none;
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    padding: 0;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: var(--surface);
+    color: var(--dim);
+    font-size: 17px;
+    cursor: pointer;
+    transition: transform 0.2s, background 0.3s;
+}
+
+#chatSummarizerWorldbookAdv-popup .ui-mode-toggle:active {
+    transform: scale(0.92);
+}
+
+#chatSummarizerWorldbookAdv-popup .strata-card {
+    padding: 16px 15px 14px;
+    margin-bottom: 12px;
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+#chatSummarizerWorldbookAdv-popup .strata-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 13px;
+}
+
+#chatSummarizerWorldbookAdv-popup .strata-label {
+    color: var(--faint);
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+}
+
+#chatSummarizerWorldbookAdv-popup .strata-count {
+    color: var(--text);
+    font-family: var(--ff-num);
+    font-size: 26px;
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: -0.02em;
+}
+
+#chatSummarizerWorldbookAdv-popup .strata-count small {
+    margin-left: 3px;
+    color: var(--dim);
+    font-family: var(--ff-sans);
+    font-size: 12px;
+    font-weight: 400;
+}
+
+#chatSummarizerWorldbookAdv-popup .strata-mode {
+    padding: 3px 9px;
+    border: 1px solid var(--line-soft);
+    border-radius: 99px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-family: var(--ff-num);
+    font-size: 10.5px;
+    white-space: nowrap;
+}
+
+#chatSummarizerWorldbookAdv-popup .strata-mode.mode-inject { color: var(--ok); }
+#chatSummarizerWorldbookAdv-popup .strata-mode.mode-lorebook { color: var(--warn); }
+
+#chatSummarizerWorldbookAdv-popup .strata-bar {
+    display: flex;
+    gap: 2px;
+    height: 38px;
+    overflow: hidden;
+    border-radius: var(--r-sm);
+    background: var(--sunken);
+}
+
+#chatSummarizerWorldbookAdv-popup .strata-segment {
+    display: grid;
+    flex: 0 0 0;
+    min-width: 2px;
+    place-items: center;
+    transition: flex-basis 0.6s cubic-bezier(0.4, 0, 0.2, 1), background 0.6s ease;
+}
+
+#chatSummarizerWorldbookAdv-popup .strata-segment span {
+    opacity: 0;
+    color: rgba(255, 255, 255, 0.72);
+    font-family: var(--ff-num);
+    font-size: 9.5px;
+    letter-spacing: 0.05em;
+    writing-mode: vertical-rl;
+}
+
+#chatSummarizerWorldbookAdv-popup .strata-segment.wide span { opacity: 1; }
+#chatSummarizerWorldbookAdv-popup .strata-segment.gen-0 { background: var(--s-fresh); }
+#chatSummarizerWorldbookAdv-popup .strata-segment.gen-1 { background: var(--s-g1); }
+#chatSummarizerWorldbookAdv-popup .strata-segment.gen-2 { background: var(--s-g2); }
+#chatSummarizerWorldbookAdv-popup .strata-segment.gen-3 { background: var(--s-g3); }
+
+#chatSummarizerWorldbookAdv-popup .strata-empty {
+    display: grid;
+    width: 100%;
+    place-items: center;
+    color: var(--faint);
+    font-size: 11px;
+}
+
+#chatSummarizerWorldbookAdv-popup .strata-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-top: 11px;
+}
+
+#chatSummarizerWorldbookAdv-popup .strata-legend b {
+    color: var(--dim);
+    font-size: 11.5px;
+    font-weight: 400;
+}
+
+#chatSummarizerWorldbookAdv-popup .strata-legend i {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    margin-right: 5px;
+    border-radius: 2px;
+    vertical-align: -1px;
+}
+
+#chatSummarizerWorldbookAdv-popup .strata-legend .compressed { background: var(--s-g2); }
+#chatSummarizerWorldbookAdv-popup .strata-legend .fresh { background: var(--s-fresh); }
+
+#chatSummarizerWorldbookAdv-popup .strata-floor-line {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 12px;
+    padding-top: 10px;
+    margin-top: 10px;
+    border-top: 1px solid var(--line-soft);
+    color: var(--faint);
+    font-size: 11.5px;
+}
+
+#chatSummarizerWorldbookAdv-popup .strata-floor-line em {
+    color: var(--dim);
+    font-family: var(--ff-num);
+    font-style: normal;
+}
+
+#chatSummarizerWorldbookAdv-popup .summary-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 4px;
+    margin-bottom: 12px;
+    border-radius: var(--r-md);
+    background: var(--surface-2);
+}
+
+#chatSummarizerWorldbookAdv-popup .summary-tab {
+    flex: 1;
+    padding: 9px 0;
+    border: 0;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--dim);
+    font-family: var(--ff-sans);
+    font-size: 13.5px;
+    cursor: pointer;
+    transition: 0.25s;
+}
+
+#chatSummarizerWorldbookAdv-popup .summary-tab[aria-selected="true"] {
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+#chatSummarizerWorldbookAdv-popup .knotted-panel {
+    display: none;
+    animation: knotted-rise 0.3s ease both;
+}
+
+#chatSummarizerWorldbookAdv-popup .knotted-panel.on { display: block; }
+
+@keyframes knotted-rise {
+    from { opacity: 0; transform: translateY(7px); }
+    to { opacity: 1; transform: none; }
+}
+
+#chatSummarizerWorldbookAdv-popup .summarizer-card {
+    margin-bottom: 11px;
+    overflow: hidden;
+    border: 0;
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+#chatSummarizerWorldbookAdv-popup .card-header,
+#chatSummarizerWorldbookAdv-popup .static-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 15px 15px 11px;
+    background: transparent;
+}
+
+#chatSummarizerWorldbookAdv-popup .card-header { cursor: pointer; }
+#chatSummarizerWorldbookAdv-popup .card-header:active { background: var(--surface-2); }
+
+#chatSummarizerWorldbookAdv-popup .header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+#chatSummarizerWorldbookAdv-popup .header-left > div { min-width: 0; }
+
+#chatSummarizerWorldbookAdv-popup .header-title {
+    margin: 0;
+    color: var(--text);
+    font-family: var(--ff-serif);
+    font-size: 14.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+}
+
+#chatSummarizerWorldbookAdv-popup .header-subtitle,
+#chatSummarizerWorldbookAdv-popup .hint {
+    margin: 3px 0 0;
+    color: var(--faint);
+    font-size: 12px;
+    line-height: 1.55;
+}
+
+#chatSummarizerWorldbookAdv-popup .card-icon {
+    display: none;
+}
+
+#chatSummarizerWorldbookAdv-popup .header-right {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 7px;
+}
+
+#chatSummarizerWorldbookAdv-popup .chevron-icon {
+    width: 17px;
+    height: 17px;
+    color: var(--faint);
+    transition: transform 0.25s ease;
+}
+
+#chatSummarizerWorldbookAdv-popup .chevron-icon.rotated { transform: rotate(90deg); }
+
+#chatSummarizerWorldbookAdv-popup .card-content {
+    display: none;
+    border-top: 0;
+}
+
+#chatSummarizerWorldbookAdv-popup .card-content.expanded { display: block; }
+
+#chatSummarizerWorldbookAdv-popup .card-content-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 13px;
+    padding: 0 15px 15px;
+    background: var(--surface);
+}
+
+#chatSummarizerWorldbookAdv-popup .card-footer {
+    padding: 0 15px 15px;
+    border-top: 0;
+    background: var(--surface);
+}
+
+#chatSummarizerWorldbookAdv-popup label {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--dim);
+    font-size: 12px;
+    letter-spacing: 0.02em;
+}
+
+#chatSummarizerWorldbookAdv-popup input[type="text"],
+#chatSummarizerWorldbookAdv-popup input[type="number"],
+#chatSummarizerWorldbookAdv-popup input[type="password"],
+#chatSummarizerWorldbookAdv-popup select,
+#chatSummarizerWorldbookAdv-popup textarea {
+    width: 100%;
+    padding: 11px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--sunken);
+    color: var(--text);
+    font-family: var(--ff-sans);
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+#chatSummarizerWorldbookAdv-popup textarea {
+    min-height: 140px;
+    resize: vertical;
+}
+
+#chatSummarizerWorldbookAdv-popup input:focus,
+#chatSummarizerWorldbookAdv-popup select:focus,
+#chatSummarizerWorldbookAdv-popup textarea:focus {
+    outline: 0;
+    border-color: var(--accent);
+}
+
+#chatSummarizerWorldbookAdv-popup input[type="number"] { font-family: var(--ff-num); }
+
+#chatSummarizerWorldbookAdv-popup .grid-2-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+#chatSummarizerWorldbookAdv-popup .settings-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+}
+
+#chatSummarizerWorldbookAdv-popup .input-group {
+    display: flex;
+    align-items: stretch;
+    gap: 7px;
+}
+
+#chatSummarizerWorldbookAdv-popup .input-group > select,
+#chatSummarizerWorldbookAdv-popup .input-group > input { min-width: 0; }
+
+#chatSummarizerWorldbookAdv-popup .summary-type-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    padding: 0;
+    border: 0;
+}
+
+#chatSummarizerWorldbookAdv-popup .summary-type-options label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 13px;
+    margin: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 13px;
+    cursor: pointer;
+}
+
+#chatSummarizerWorldbookAdv-popup input[type="radio"] { accent-color: var(--accent); }
+
+#chatSummarizerWorldbookAdv-popup .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 0;
+    border-top: 1px solid var(--line-soft);
+}
+
+#chatSummarizerWorldbookAdv-popup .setting-key {
+    color: var(--text);
+    font-size: 13.5px;
+}
+
+#chatSummarizerWorldbookAdv-popup .setting-key em {
+    display: block;
+    margin-top: 1px;
+    color: var(--faint);
+    font-size: 11px;
+    font-style: normal;
+    line-height: 1.4;
+}
+
+#chatSummarizerWorldbookAdv-popup .stepper {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 2px;
+}
+
+#chatSummarizerWorldbookAdv-popup .stepper .step-button {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: 17px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+#chatSummarizerWorldbookAdv-popup .stepper .step-button:active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+#chatSummarizerWorldbookAdv-popup .stepper input[type="number"] {
+    width: 62px;
+    height: 34px;
+    padding: 0 2px;
+    border: 0;
+    background: transparent;
+    text-align: center;
+    -moz-appearance: textfield;
+}
+
+#chatSummarizerWorldbookAdv-popup .stepper input[type="number"]::-webkit-inner-spin-button,
+#chatSummarizerWorldbookAdv-popup .stepper input[type="number"]::-webkit-outer-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+}
+
+#chatSummarizerWorldbookAdv-popup .switch-control {
+    position: relative;
+    display: block;
+    flex: none;
+    width: 46px;
+    height: 27px;
+    margin: 0;
+}
+
+#chatSummarizerWorldbookAdv-popup .switch-control input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+}
+
+#chatSummarizerWorldbookAdv-popup .switch-control span {
+    position: absolute;
+    inset: 0;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--sunken);
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+#chatSummarizerWorldbookAdv-popup .switch-control span::after {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 21px;
+    height: 21px;
+    border-radius: 50%;
+    background: var(--dim);
+    content: "";
+    transition: 0.3s;
+}
+
+#chatSummarizerWorldbookAdv-popup .switch-control input:checked + span {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+}
+
+#chatSummarizerWorldbookAdv-popup .switch-control input:checked + span::after {
+    left: 21px;
+    background: var(--accent);
+}
+
+#chatSummarizerWorldbookAdv-popup .button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 11px 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-sm);
+    background: var(--surface-2);
+    color: var(--text);
+    font-family: var(--ff-sans);
+    font-size: 13px;
+    cursor: pointer;
+    transition: transform 0.15s, background 0.2s, border-color 0.2s;
+}
+
+#chatSummarizerWorldbookAdv-popup .button:active { transform: scale(0.98); }
+
+#chatSummarizerWorldbookAdv-popup .button-primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 500;
+}
+
+#chatSummarizerWorldbookAdv-popup .button-secondary { background: var(--surface-2); }
+#chatSummarizerWorldbookAdv-popup .button-subtle { background: transparent; color: var(--dim); }
+#chatSummarizerWorldbookAdv-popup .button:disabled { opacity: 0.45; cursor: default; }
+
+#chatSummarizerWorldbookAdv-popup .button-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+#chatSummarizerWorldbookAdv-popup .button-group .button {
+    flex: 1 1 auto;
+    min-width: 86px;
+}
+
+#chatSummarizerWorldbookAdv-popup .wide-action {
+    width: 100%;
+    padding: 14px;
+    border-radius: var(--r-md);
+    font-size: 14.5px;
+}
+
+#chatSummarizerWorldbookAdv-popup .status-list { padding: 0 15px 15px; }
+
+#chatSummarizerWorldbookAdv-popup .stat-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 0;
+    border-top: 1px solid var(--line-soft);
+    color: var(--text);
+    font-size: 13px;
+}
+
+#chatSummarizerWorldbookAdv-popup .stat-row:first-child { border-top: 0; }
+
+#chatSummarizerWorldbookAdv-popup .stat-value {
+    color: var(--dim);
+    font-family: var(--ff-num);
+    text-align: right;
+}
+
+#chatSummarizerWorldbookAdv-popup .stat-value.good { color: var(--ok); }
+
+#chatSummarizerWorldbookAdv-popup .summary-status-line {
+    padding: 10px 12px;
+    margin-top: 8px;
+    border-radius: var(--r-sm);
+    background: var(--sunken);
+    color: var(--faint);
+    font-family: var(--ff-num);
+    font-size: 11px;
+    line-height: 1.7;
+}
+
+#chatSummarizerWorldbookAdv-popup .notice-box,
+#chatSummarizerWorldbookAdv-popup .worldbook-edit-note {
+    padding: 10px 12px;
+    border-radius: var(--r-sm);
+    background: var(--accent-soft);
+    color: var(--dim);
+    font-size: 11.5px;
+    line-height: 1.6;
+}
+
+#chatSummarizerWorldbookAdv-popup .notice-box p { margin: 0; }
+
+#chatSummarizerWorldbookAdv-popup .api-status-badge {
+    padding: 3px 8px;
+    border: 1px solid var(--line-soft);
+    border-radius: 20px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 10.5px;
+    white-space: nowrap;
+}
+
+#chatSummarizerWorldbookAdv-popup .api-status-badge .dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 4px;
+    border-radius: 50%;
+    background: var(--faint);
+}
+
+#chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-theme-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 0 15px 15px;
+}
+
+#chatSummarizerWorldbookAdv-popup .chatSummarizerWorldbookAdv-theme-button {
+    width: 24px !important;
+    min-width: 24px !important;
+    height: 24px !important;
+    padding: 0 !important;
+    border-width: 1px !important;
+    border-radius: 50% !important;
+}
+
+#chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-custom-color-picker-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 !important;
+    text-align: left !important;
+}
+
+#chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-custom-color-picker-container label {
+    margin: 0 !important;
+}
+
+#chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-custom-color-input {
+    width: 42px !important;
+    height: 28px !important;
+    padding: 1px !important;
+}
+
+#chatSummarizerWorldbookAdv-popup #chatSummarizerWorldbookAdv-status-message {
+    min-height: 18px;
+    margin: 16px 0 4px !important;
+    color: var(--faint) !important;
+    font-size: 12px;
+    font-style: normal !important;
+    text-align: center;
+}
+
+#chatSummarizerWorldbookAdv-popup .knotted-foot {
+    margin-top: 22px;
+    color: var(--faint);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-align: center;
+}
+
+@media (max-width: 520px) {
+    #chatSummarizerWorldbookAdv-popup {
+        padding: 10px 8px 24px;
+        border-radius: 0;
+    }
+
+    #chatSummarizerWorldbookAdv-popup .grid-2-col { grid-template-columns: 1fr; }
+    #chatSummarizerWorldbookAdv-popup .input-group { flex-wrap: wrap; }
+    #chatSummarizerWorldbookAdv-popup .input-group > select,
+    #chatSummarizerWorldbookAdv-popup .input-group > input { flex-basis: 100%; }
+}
+
+@media (max-width: 360px) {
+    #chatSummarizerWorldbookAdv-popup .setting-row {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    #chatSummarizerWorldbookAdv-popup .stepper { align-self: flex-end; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #chatSummarizerWorldbookAdv-popup,
+    #chatSummarizerWorldbookAdv-popup * {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
