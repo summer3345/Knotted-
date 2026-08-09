@@ -2178,10 +2178,40 @@ let activePopupHandle = null;
                 }
                 #${POPUP_ID} * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
+                /* 只清理结绳自己的 SillyTavern 通用弹窗外壳 */
+                dialog.${SCRIPT_ID_PREFIX}-dialog-shell {
+                    width: min(calc(100vw - 12px), 580px) !important;
+                    max-width: min(calc(100vw - 12px), 580px) !important;
+                    padding: 0 !important;
+                    border: 0 !important;
+                    border-radius: 0 !important;
+                    background: transparent !important;
+                    box-shadow: none !important;
+                }
+                dialog.${SCRIPT_ID_PREFIX}-dialog-shell .popup-body,
+                dialog.${SCRIPT_ID_PREFIX}-dialog-shell .popup-content {
+                    width: 100% !important;
+                    padding-left: 0 !important;
+                    padding-right: 0 !important;
+                    border: 0 !important;
+                    background: transparent !important;
+                }
+                dialog.${SCRIPT_ID_PREFIX}-dialog-shell .popup-button-close {
+                    display: none !important;
+                }
+
                 /* ===== 头部 ===== */
                 #${POPUP_ID} .summarizer-header {
-                    text-align: center;
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    gap: 12px;
+                    text-align: left;
                     padding: 14px 8px 16px;
+                }
+                #${POPUP_ID} .summarizer-brand {
+                    flex: 1 1 auto;
+                    min-width: 0;
                 }
                 #${POPUP_ID} .summarizer-header h1 {
                     font-size: 19px; font-weight: 600; margin: 0 0 6px;
@@ -2195,9 +2225,15 @@ let activePopupHandle = null;
                 }
                 #${POPUP_ID} .chat-name span { color: var(--accent); font-weight: 500; }
 
-                /* 日夜切换按钮 */
+                /* 顶栏操作按钮 */
+                #${POPUP_ID} .header-actions {
+                    display: flex;
+                    flex: none;
+                    align-items: center;
+                    gap: 7px;
+                }
                 #${POPUP_ID} .ui-mode-toggle {
-                    width: 38px; height: 38px; border-radius: 50%;
+                    width: 36px; min-width: 36px; height: 36px; border-radius: 50%;
                     border: 1px solid var(--line); background: var(--surface);
                     color: var(--dim); font-size: 16px; cursor: pointer;
                     display: inline-grid; place-items: center; padding: 0;
@@ -2276,8 +2312,10 @@ let activePopupHandle = null;
                 #${POPUP_ID} select,
                 #${POPUP_ID} textarea {
                     width: 100%;
-                    background: var(--sunken);
-                    color: var(--text);
+                    background-color: var(--sunken) !important;
+                    color: var(--text) !important;
+                    -webkit-text-fill-color: var(--text) !important;
+                    caret-color: var(--accent) !important;
                     border: 1px solid var(--line);
                     border-radius: var(--r-sm);
                     padding: 11px 12px;
@@ -2285,6 +2323,34 @@ let activePopupHandle = null;
                     font-size: 13.5px;
                     line-height: 1.6;
                     transition: border-color 0.2s;
+                }
+                #${POPUP_ID}:not(.day) input[type="text"],
+                #${POPUP_ID}:not(.day) input[type="number"],
+                #${POPUP_ID}:not(.day) input[type="password"],
+                #${POPUP_ID}:not(.day) select,
+                #${POPUP_ID}:not(.day) textarea {
+                    color-scheme: dark;
+                }
+                #${POPUP_ID}.day input[type="text"],
+                #${POPUP_ID}.day input[type="number"],
+                #${POPUP_ID}.day input[type="password"],
+                #${POPUP_ID}.day select,
+                #${POPUP_ID}.day textarea {
+                    color-scheme: light;
+                }
+                #${POPUP_ID} input::placeholder,
+                #${POPUP_ID} textarea::placeholder {
+                    color: var(--faint) !important;
+                    -webkit-text-fill-color: var(--faint) !important;
+                    opacity: 1;
+                }
+                #${POPUP_ID} select option {
+                    background-color: var(--surface);
+                    color: var(--text);
+                }
+                #${POPUP_ID} .stepper input[type="number"] {
+                    border: 1px solid var(--line) !important;
+                    background-color: var(--sunken) !important;
                 }
                 #${POPUP_ID} textarea { min-height: 130px; resize: vertical; line-height: 1.75; }
                 #${POPUP_ID} input:focus,
@@ -2488,8 +2554,11 @@ let activePopupHandle = null;
                         <h1>结绳 · Knotted</h1>
                         <p>SUMMARY &amp; MEMORY</p>
                     </div>
-                    <button id="${SCRIPT_ID_PREFIX}-ui-mode-toggle" class="ui-mode-toggle" title="切换日夜">☾</button>
-                    <button id="${SCRIPT_ID_PREFIX}-help-toggle" class="ui-mode-toggle" title="使用说明">?</button>
+                    <div class="header-actions">
+                        <button id="${SCRIPT_ID_PREFIX}-ui-mode-toggle" class="ui-mode-toggle" title="切换日夜" aria-label="切换日夜">☾</button>
+                        <button id="${SCRIPT_ID_PREFIX}-help-toggle" class="ui-mode-toggle" title="使用说明" aria-label="使用说明">?</button>
+                        <button id="${SCRIPT_ID_PREFIX}-panel-close" class="ui-mode-toggle" title="关闭" aria-label="关闭">×</button>
+                    </div>
                 </header>
 
                 <div class="mem-panel strata-card">
@@ -3110,6 +3179,10 @@ let activePopupHandle = null;
                 return;
             }
             $popupInstance = currentDialogPopupContent;
+            var $dialogShell = $popupInstance.closest('dialog[open]');
+            if ($dialogShell.length) {
+                $dialogShell.addClass(SCRIPT_ID_PREFIX + '-dialog-shell');
+            }
 
             // 获取所有UI元素的jQuery对象 (这部分代码保持不变，确保所有变量都已定义)
             $totalCharsDisplay = $popupInstance.find(`#${SCRIPT_ID_PREFIX}-total-chars`); $summaryStatusDisplay = $popupInstance.find(`#${SCRIPT_ID_PREFIX}-summary-status`);
@@ -3243,6 +3316,20 @@ let activePopupHandle = null;
                 // 点遮罩空白处也关闭
                 $mask.on('click', function (e) {
                     if (e.target === this) $mask.removeClass('open');
+                });
+            })();
+            (function () {
+                var $closeBtn = jQuery_API('#' + SCRIPT_ID_PREFIX + '-panel-close');
+                if (!$closeBtn.length) return;
+                $closeBtn.on('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    var $nativeClose = $dialogShell.find('.popup-button-close').first();
+                    if ($nativeClose.length) {
+                        $nativeClose.trigger('click');
+                    } else if ($dialogShell.length && $dialogShell[0] && typeof $dialogShell[0].close === 'function') {
+                        $dialogShell[0].close();
+                    }
                 });
             })();
             (function () {
