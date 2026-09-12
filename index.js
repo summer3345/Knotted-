@@ -721,6 +721,8 @@ let activePopupHandle = null;
     let customApiConfig = { url: '', apiKey: '', model: '' };
     // let currentSystemPrompt = DEFAULT_SYSTEM_PROMPT; // Replaced by two new prompt variables
     let isAutoSummarizing = false;
+    let lastChatLoadErrorMessage = '';
+    let lastSummaryErrorMessage = '';
     // let customChunkSizeSetting = DEFAULT_CHUNK_SIZE; // Replaced
     let customSmallChunkSizeSetting = DEFAULT_SMALL_CHUNK_SIZE;
     let customLargeChunkSizeSetting = DEFAULT_LARGE_CHUNK_SIZE;
@@ -1881,13 +1883,15 @@ let activePopupHandle = null;
     
             await loadAllChatMessages();
     
-            try {
-                currentPrimaryLorebook = await TavernHelper_API.getCurrentCharPrimaryLorebook();
-                if (currentPrimaryLorebook) {
-                    logDebug(`当前主世界书: ${currentPrimaryLorebook}`);
-                    await manageSummaryLorebookEntries();
-                } else { logEnvWarn("未找到主世界书，无法管理世界书条目。"); }
-            } catch (e) { logError("获取主世界书或管理条目时失败: ", e); currentPrimaryLorebook = null; }
+            if (currentStorageMode === STORAGE_MODE_LOREBOOK) {
+                try {
+                    currentPrimaryLorebook = await TavernHelper_API.getCurrentCharPrimaryLorebook();
+                    if (currentPrimaryLorebook) {
+                        logDebug(`当前主世界书: ${currentPrimaryLorebook}`);
+                        await manageSummaryLorebookEntries();
+                    } else { logEnvWarn("未找到主世界书，无法管理世界书条目。"); }
+                } catch (e) { logError("获取主世界书或管理条目时失败: ", e); currentPrimaryLorebook = null; }
+            }
     
             await applyPersistedSummaryStatusFromLorebook();
     
@@ -2555,6 +2559,47 @@ let activePopupHandle = null;
                     text-align: center; font-size: 12px; color: var(--faint);
                     margin: 16px 0 4px; font-style: normal; min-height: 18px;
                 }
+                #${POPUP_ID} .bulk-progress-panel {
+                    margin: 0 14px 14px;
+                    padding: 11px 12px;
+                    background: var(--sunken);
+                    border: 1px solid var(--line-soft);
+                    border-radius: var(--r-sm);
+                }
+                #${POPUP_ID} .bulk-progress-panel[hidden] { display: none !important; }
+                #${POPUP_ID} .bulk-progress-head {
+                    display: flex; align-items: center; justify-content: space-between;
+                    gap: 10px; margin-bottom: 8px;
+                    font-size: 12px; color: var(--dim);
+                }
+                #${POPUP_ID} .bulk-progress-percent {
+                    flex: none; font-family: var(--ff-num); color: var(--text);
+                }
+                #${POPUP_ID} .bulk-progress-track {
+                    height: 8px; overflow: hidden;
+                    background: var(--surface-2);
+                    border-radius: 999px;
+                }
+                #${POPUP_ID} .bulk-progress-fill {
+                    width: 0; height: 100%;
+                    background: var(--accent);
+                    border-radius: inherit;
+                    transition: width 0.25s ease;
+                }
+                #${POPUP_ID} .bulk-progress-detail {
+                    margin-top: 8px; font-size: 11.5px;
+                    line-height: 1.55; color: var(--faint);
+                    overflow-wrap: anywhere;
+                }
+                #${POPUP_ID} .bulk-progress-panel[data-state="success"] .bulk-progress-fill { background: var(--ok); }
+                #${POPUP_ID} .bulk-progress-panel[data-state="error"] {
+                    border-color: var(--warn);
+                }
+                #${POPUP_ID} .bulk-progress-panel[data-state="error"] .bulk-progress-head,
+                #${POPUP_ID} .bulk-progress-panel[data-state="error"] .bulk-progress-detail {
+                    color: var(--warn);
+                }
+                #${POPUP_ID} .bulk-progress-panel[data-state="error"] .bulk-progress-fill { background: var(--warn); }
 
                 /* ===== 记忆状态卡片（本单新增） ===== */
                 #${POPUP_ID} .mem-panel {
@@ -3087,6 +3132,16 @@ let activePopupHandle = null;
                                     <button id="${SCRIPT_ID_PREFIX}-save-auto-summary-settings" class="button button-secondary">保存设置</button>
                                     <button id="${SCRIPT_ID_PREFIX}-auto-summarize" class="button button-primary">立即执行</button>
                                 </div>
+                            </div>
+                            <div id="${SCRIPT_ID_PREFIX}-bulk-progress" class="bulk-progress-panel" data-state="idle" hidden aria-live="polite">
+                                <div class="bulk-progress-head">
+                                    <span id="${SCRIPT_ID_PREFIX}-bulk-progress-title">等待开始</span>
+                                    <span id="${SCRIPT_ID_PREFIX}-bulk-progress-percent" class="bulk-progress-percent">0%</span>
+                                </div>
+                                <div id="${SCRIPT_ID_PREFIX}-bulk-progress-track" class="bulk-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                                    <div id="${SCRIPT_ID_PREFIX}-bulk-progress-fill" class="bulk-progress-fill"></div>
+                                </div>
+                                <div id="${SCRIPT_ID_PREFIX}-bulk-progress-detail" class="bulk-progress-detail"></div>
                             </div>
                         </div>
                     </div>
@@ -4001,10 +4056,22 @@ let activePopupHandle = null;
         $summaryStatusDisplay.text(statusText.trim() || "状态未知。");
     }
     async function loadAllChatMessages() { /* ... (no change) ... */
-        if (!coreApisAreReady || !TavernHelper_API) return;
+        lastChatLoadErrorMessage = '';
+        if (!TavernHelper_API || typeof TavernHelper_API.getChatMessages !== 'function') {
+            // TavernHelper 可能比本插件更晚加载；每次真正取消息前重新探测一次。
+            attemptToLoadCoreApis();
+        }
+        if (!coreApisAreReady) {
+            lastChatLoadErrorMessage = '结绳核心 API 尚未就绪，请刷新酒馆页面后重试。';
+            return false;
+        }
+        if (!TavernHelper_API || typeof TavernHelper_API.getChatMessages !== 'function') {
+            lastChatLoadErrorMessage = 'TavernHelper 尚未就绪，无法读取聊天记录。请确认已启用 TavernHelper，然后刷新酒馆页面。';
+            return false;
+        }
         try {
             const lastMessageId = TavernHelper_API.getLastMessageId ? TavernHelper_API.getLastMessageId() : (SillyTavern_API.chat?.length ? SillyTavern_API.chat.length -1 : -1);
-            if (lastMessageId < 0) { allChatMessages = []; logDebug("No chat messages found."); return; }
+            if (lastMessageId < 0) { allChatMessages = []; logDebug("No chat messages found."); return true; }
             const messagesFromApi = await TavernHelper_API.getChatMessages(`0-${lastMessageId}`, { include_swipes: false });
             if (messagesFromApi && messagesFromApi.length > 0) {
                 allChatMessages = messagesFromApi.map((msg, index) => ({
@@ -4016,7 +4083,12 @@ let activePopupHandle = null;
                 }));
                 logDebug(`Loaded ${allChatMessages.length} messages for chat: ${currentChatFileIdentifier}.`);
             } else { allChatMessages = []; logDebug("No chat messages returned from API."); }
-        } catch (error) { logError("获取聊天记录失败: " + error.message); console.error(error); showToastr("error", "获取聊天记录失败。"); allChatMessages = []; }
+            return true;
+        } catch (error) {
+            lastChatLoadErrorMessage = '读取聊天记录失败：' + (error && error.message ? error.message : String(error));
+            logError(lastChatLoadErrorMessage); console.error(error); showToastr("error", lastChatLoadErrorMessage); allChatMessages = [];
+            return false;
+        }
     }
     async function handleManualSummarize() { /* ... (no change) ... */
         if (!$popupInstance || !$manualStartFloorInput || !$manualEndFloorInput) return;
@@ -4028,6 +4100,22 @@ let activePopupHandle = null;
         }
         await summarizeAndUploadChunk(startFloor - 1, endFloor - 1);
     }
+
+    function updateBulkProgress(state, completed, total, title, detail) {
+        if (!$popupInstance) return;
+        var $panel = $popupInstance.find(`#${SCRIPT_ID_PREFIX}-bulk-progress`);
+        if (!$panel.length) return;
+        var safeTotal = Math.max(0, parseInt(total, 10) || 0);
+        var safeCompleted = Math.max(0, Math.min(safeTotal, parseInt(completed, 10) || 0));
+        var percent = safeTotal > 0 ? Math.round((safeCompleted / safeTotal) * 100) : (state === 'success' ? 100 : 0);
+        $panel.prop('hidden', false).show().attr('data-state', state || 'running');
+        $popupInstance.find(`#${SCRIPT_ID_PREFIX}-bulk-progress-title`).text(title || '批量总结');
+        $popupInstance.find(`#${SCRIPT_ID_PREFIX}-bulk-progress-percent`).text(percent + '%');
+        $popupInstance.find(`#${SCRIPT_ID_PREFIX}-bulk-progress-fill`).css('width', percent + '%');
+        $popupInstance.find(`#${SCRIPT_ID_PREFIX}-bulk-progress-detail`).text(detail || '');
+        $popupInstance.find(`#${SCRIPT_ID_PREFIX}-bulk-progress-track`).attr('aria-valuenow', percent);
+    }
+
     //【90修改】手动执行自动总结的逻辑
     /**
      * 批量总结前的预检。
@@ -4084,74 +4172,129 @@ let activePopupHandle = null;
     }
 
     async function handleAutoSummarize() {
+        if (isAutoSummarizing) {
+            const runningMessage = "批量总结已在进行中，请等待当前任务完成。";
+            showToastr("info", runningMessage);
+            updateBulkProgress('running', 0, 1, '批量总结进行中', runningMessage);
+            return;
+        }
+        if (isResettingState) {
+            const resettingMessage = "正在同步当前聊天，请稍后再点一次「立即执行」。";
+            showToastr("warning", resettingMessage);
+            if($statusMessageSpan) $statusMessageSpan.text(resettingMessage);
+            updateBulkProgress('error', 0, 1, '暂时无法开始', resettingMessage);
+            return;
+        }
         if (!customApiConfig.url || !customApiConfig.model) {
-            showToastr("warning", "请先配置API信息(URL和模型必需)并保存。");
+            const configMessage = "请先配置API信息(URL和模型必需)并保存。";
+            showToastr("warning", configMessage);
             if ($popupInstance && $apiConfigAreaDiv && $apiConfigAreaDiv.is(':hidden')) {
                 if($apiConfigSectionToggle) $apiConfigSectionToggle.trigger('click');
             }
             if($customApiUrlInput) $customApiUrlInput.focus();
             if($statusMessageSpan) $statusMessageSpan.text("错误：请先配置API。");
+            updateBulkProgress('error', 0, 1, '无法开始批量总结', configMessage);
             return; // 直接返回，不继续执行
         }
-        if (isAutoSummarizing) {
-            showToastr("info", "自动总结已在进行中...");
-            return;
-        }
-        var mayProceed = await confirmBulkSummarizeIfNeeded();
-        if (!mayProceed) {
-            if ($statusMessageSpan) $statusMessageSpan.text("已取消批量总结。");
-            return;
-        }
-        const effectiveChunkSize = getEffectiveChunkSize("handleAutoSummarize_UI");
-        // --- NEW TRIGGER LOGIC: N + X ---
-        const triggerThreshold = effectiveChunkSize + currentReserveCount;
-
-        logDebug(`HandleAutoSummarize: 使用间隔(N): ${effectiveChunkSize}, 触发阈值(N+X): ${triggerThreshold}`);
         isAutoSummarizing = true;
         if ($autoSummarizeButton) $autoSummarizeButton.prop('disabled', true).text("自动总结中...");
-        if ($statusMessageSpan) $statusMessageSpan.text(`开始自动总结 (间隔 ${effectiveChunkSize} 层, 阈值 ${triggerThreshold} 层)...`);
-        else showToastr("info", `开始自动总结 (间隔 ${effectiveChunkSize} 层, 阈值 ${triggerThreshold} 层)...`);
+        updateBulkProgress('running', 0, 1, '正在准备批量总结', '正在重新读取当前聊天与总结进度…');
+        let bulkTotalRounds = 1;
+        let bulkCompletedRounds = 0;
 
         try {
-            let maxSummarizedFloor = await getMaxSummarizedFloor();
-            let nextChunkStartFloor = maxSummarizedFloor + 1;
-            if (allChatMessages.length === 0) { await loadAllChatMessages(); }
+            // 插件可能早于 TavernHelper 完成加载；执行时重新探测，避免只在部分设备上静默失效。
+            attemptToLoadCoreApis();
+            if (!TavernHelper_API || typeof TavernHelper_API.getChatMessages !== 'function') {
+                throw new Error('TavernHelper 尚未就绪，无法读取聊天记录。请确认已启用 TavernHelper，然后刷新酒馆页面。');
+            }
+            if (!currentChatFileIdentifier || currentChatFileIdentifier.startsWith('unknown_chat')) {
+                if (typeof TavernHelper_API.triggerSlash === 'function') {
+                    const detectedChatName = await TavernHelper_API.triggerSlash('/getchatname');
+                    if (detectedChatName && typeof detectedChatName === 'string' && detectedChatName.trim() !== '' && detectedChatName.trim() !== 'null' && detectedChatName.trim() !== 'undefined') {
+                        currentChatFileIdentifier = cleanChatName(detectedChatName.trim());
+                    }
+                }
+            }
+            const loadSucceeded = await loadAllChatMessages();
+            if (!loadSucceeded) {
+                throw new Error(lastChatLoadErrorMessage || '聊天记录读取失败。');
+            }
+            if (!currentChatFileIdentifier || currentChatFileIdentifier.startsWith('unknown_chat')) {
+                throw new Error('无法确定当前聊天名称。请重新选择一次聊天，或刷新酒馆页面后重试。');
+            }
             if (allChatMessages.length === 0) {
-                 showToastr("info", "没有聊天记录可总结。");
-                 if($statusMessageSpan) $statusMessageSpan.text("没有聊天记录。");
-                 isAutoSummarizing = false;
-                 if($autoSummarizeButton) $autoSummarizeButton.prop('disabled', false).text("开始/继续自动总结");
-                 return;
+                const emptyMessage = '当前聊天没有可总结的消息。';
+                showToastr("info", emptyMessage);
+                if($statusMessageSpan) $statusMessageSpan.text(emptyMessage);
+                updateBulkProgress('success', 0, 0, '无需执行', emptyMessage);
+                return;
             }
 
+            const effectiveChunkSize = getEffectiveChunkSize("handleAutoSummarize_UI");
+            // --- NEW TRIGGER LOGIC: N + X ---
+            const triggerThreshold = effectiveChunkSize + currentReserveCount;
+            logDebug(`HandleAutoSummarize: 使用间隔(N): ${effectiveChunkSize}, 触发阈值(N+X): ${triggerThreshold}`);
+
+            let maxSummarizedFloor = await getMaxSummarizedFloor();
+            let nextChunkStartFloor = maxSummarizedFloor + 1;
             let unsummarizedCount = allChatMessages.length - (maxSummarizedFloor + 1);
 
             // Check for the very first summarization run
             if (maxSummarizedFloor === -1 && unsummarizedCount < triggerThreshold) {
-                showToastr("info", `总楼层数 (${unsummarizedCount}) 小于首次触发阈值 (${triggerThreshold})，不进行自动总结。`);
+                const thresholdMessage = `总楼层数 (${unsummarizedCount}) 小于首次触发阈值 (${triggerThreshold})，本次没有可执行的完整区块。`;
+                showToastr("info", thresholdMessage);
                 if($statusMessageSpan) $statusMessageSpan.text(`楼层数不足 ${triggerThreshold}。`);
-                isAutoSummarizing = false;
-                if($autoSummarizeButton) $autoSummarizeButton.prop('disabled', false).text("开始/继续自动总结");
+                updateBulkProgress('success', 0, 0, '无需执行', thresholdMessage);
                 return;
             }
 
+            const totalRounds = Math.floor(Math.max(0, unsummarizedCount - currentReserveCount) / effectiveChunkSize);
+            const totalFloorsToProcess = totalRounds * effectiveChunkSize;
+            bulkTotalRounds = Math.max(1, totalRounds);
+            if (totalRounds <= 0) {
+                const noChunkMessage = `剩余 ${unsummarizedCount} 楼，尚未达到触发阈值 ${triggerThreshold}，本次没有可执行的完整区块。`;
+                showToastr("info", noChunkMessage);
+                if($statusMessageSpan) $statusMessageSpan.text(noChunkMessage);
+                updateBulkProgress('success', 0, 0, '无需执行', noChunkMessage);
+                return;
+            }
+
+            var mayProceed = await confirmBulkSummarizeIfNeeded();
+            if (!mayProceed) {
+                if ($statusMessageSpan) $statusMessageSpan.text("已取消批量总结。");
+                updateBulkProgress('idle', 0, totalRounds, '已取消批量总结', '没有调用 API，也没有修改记忆。');
+                return;
+            }
+
+            const startMessage = `开始批量总结：共 ${totalRounds} 轮，预计处理 ${totalFloorsToProcess} 楼，末尾保留 ${currentReserveCount} 楼。`;
+            if ($statusMessageSpan) $statusMessageSpan.text(startMessage);
+            else showToastr("info", startMessage);
+            updateBulkProgress('running', 0, totalRounds, `准备第 1 / ${totalRounds} 轮`, startMessage);
+
             logDebug(`自动总结：已总结到 ${maxSummarizedFloor + 1} 楼。剩余未总结 ${unsummarizedCount} 楼。下次区块大小 ${effectiveChunkSize}。触发阈值 ${triggerThreshold}`);
-            
+            let completedRounds = 0;
+
             while (unsummarizedCount >= triggerThreshold) {
                 logDebug(`自动总结循环：准备处理区块 (未总结 ${unsummarizedCount} >= 阈值 ${triggerThreshold})。当前 nextChunkStartFloor (0-based): ${nextChunkStartFloor}, 区块大小: ${effectiveChunkSize}`);
                 const currentStatusText = `正在总结 ${nextChunkStartFloor + 1} 至 ${nextChunkStartFloor + effectiveChunkSize} 楼...`;
                 if($statusMessageSpan) $statusMessageSpan.text(currentStatusText); else showToastr("info", currentStatusText);
+                updateBulkProgress('running', completedRounds, totalRounds, `正在进行第 ${completedRounds + 1} / ${totalRounds} 轮`, `${currentStatusText} 已完成 ${completedRounds * effectiveChunkSize} / ${totalFloorsToProcess} 楼。`);
+                await new Promise(resolve => setTimeout(resolve, 0));
 
+                lastSummaryErrorMessage = '';
                 const success = await summarizeAndUploadChunk(nextChunkStartFloor, nextChunkStartFloor + effectiveChunkSize - 1);
                  if (!success) {
-                    showToastr("error", `自动总结在区块 ${nextChunkStartFloor + 1}-${nextChunkStartFloor + effectiveChunkSize} 失败，已停止。`);
-                    throw new Error(`自动总结区块 ${nextChunkStartFloor + 1}-${nextChunkStartFloor + effectiveChunkSize} 失败。`);
+                    throw new Error(lastSummaryErrorMessage || `区块 ${nextChunkStartFloor + 1}-${nextChunkStartFloor + effectiveChunkSize} 总结失败。`);
                 }
-                
+
                 // Recalculate state after a successful chunk
+                completedRounds += 1;
+                bulkCompletedRounds = completedRounds;
                 maxSummarizedFloor += effectiveChunkSize;
                 nextChunkStartFloor += effectiveChunkSize;
                 unsummarizedCount -= effectiveChunkSize;
+                updateBulkProgress('running', completedRounds, totalRounds, `已完成第 ${completedRounds} / ${totalRounds} 轮`, `已处理 ${completedRounds * effectiveChunkSize} / ${totalFloorsToProcess} 楼，剩余 ${unsummarizedCount} 楼。`);
 
                 await applyPersistedSummaryStatusFromLorebook(); // This is good practice but our manual tracking is faster
                 updateUIDisplay();
@@ -4164,18 +4307,27 @@ let activePopupHandle = null;
                 "所有聊天记录已自动总结完毕！";
             showToastr(unsummarizedCount === 0 ? "success" : "info", finalStatusText);
             if($statusMessageSpan) $statusMessageSpan.text(finalStatusText);
+            updateBulkProgress('success', totalRounds, totalRounds, '批量总结完成', `${totalRounds} 轮全部完成，共处理 ${totalFloorsToProcess} 楼；剩余 ${unsummarizedCount} 楼。`);
         } catch (error) {
             logError("自动总结过程中发生错误:", error);
-            showToastr("error", "自动总结失败: " + error.message);
-            if($statusMessageSpan) $statusMessageSpan.text("自动总结出错。");
+            const reason = error && error.message ? error.message : String(error);
+            showToastr("error", "批量总结已停止：" + reason);
+            if($statusMessageSpan) $statusMessageSpan.text("批量总结已停止：" + reason);
+            updateBulkProgress('error', bulkCompletedRounds, bulkTotalRounds, '批量总结失败', reason);
         } finally {
             isAutoSummarizing = false;
-            if($autoSummarizeButton) $autoSummarizeButton.prop('disabled', false).text("开始/继续自动总结");
+            if($autoSummarizeButton) $autoSummarizeButton.prop('disabled', false).text("立即执行");
         }
     }
     async function summarizeAndUploadChunk(startInternalId, endInternalId) { /* ... (no change) ... */
-        if (!coreApisAreReady) { showToastr("error", "核心API未就绪，无法总结。"); return false; }
+        lastSummaryErrorMessage = '';
+        if (!coreApisAreReady) {
+            lastSummaryErrorMessage = "核心API未就绪，无法总结。";
+            showToastr("error", lastSummaryErrorMessage);
+            return false;
+        }
         if (!customApiConfig.url || !customApiConfig.model) {
+            lastSummaryErrorMessage = "自定义AI未配置或未选模型。";
             showToastr("warning", "请先配置API信息(URL和模型必需)并保存。");
             if ($popupInstance && $apiConfigAreaDiv && $apiConfigAreaDiv.is(':hidden')) {
                 if($apiConfigSectionToggle) $apiConfigSectionToggle.trigger('click');
@@ -4186,8 +4338,11 @@ let activePopupHandle = null;
             return false;
         }
 
-        let proceedToUpload = true;
-        if (!currentPrimaryLorebook) {
+        let proceedToUpload = currentStorageMode === STORAGE_MODE_LOREBOOK;
+        if (currentStorageMode === STORAGE_MODE_LOREBOOK && !currentPrimaryLorebook && typeof TavernHelper_API?.getCurrentCharPrimaryLorebook === 'function') {
+            currentPrimaryLorebook = await TavernHelper_API.getCurrentCharPrimaryLorebook();
+        }
+        if (currentStorageMode === STORAGE_MODE_LOREBOOK && !currentPrimaryLorebook) {
             proceedToUpload = await confirmCompat("未找到主世界书，总结内容将不会上传。是否继续仅在本地总结（不上传到世界书）？", "继续总结确认");
             if (proceedToUpload) {
                 logWarn("No primary lorebook, summary will not be uploaded, user chose to proceed.");
@@ -4196,11 +4351,11 @@ let activePopupHandle = null;
                 if ($popupInstance && $statusMessageSpan) $statusMessageSpan.text("总结操作已取消。");
             }
         }
-        if (!proceedToUpload && !currentPrimaryLorebook) {
+        if (currentStorageMode === STORAGE_MODE_LOREBOOK && !proceedToUpload && !currentPrimaryLorebook) {
              if($statusMessageSpan) $statusMessageSpan.text("总结操作已取消。");
             return false;
         }
-        return await proceedWithSummarization(startInternalId, endInternalId, (proceedToUpload && !!currentPrimaryLorebook) );
+        return await proceedWithSummarization(startInternalId, endInternalId, (currentStorageMode === STORAGE_MODE_LOREBOOK && proceedToUpload && !!currentPrimaryLorebook) );
     }
     async function manageSummaryLorebookEntries() {
         if (!currentPrimaryLorebook || !TavernHelper_API?.getLorebookEntries || !TavernHelper_API?.setLorebookEntries) {
@@ -5220,12 +5375,14 @@ let activePopupHandle = null;
 
     async function proceedWithSummarization(startInternalId, endInternalId, shouldUploadToLorebook) { /* ... (no change) ... */
         if (isCompressing) {
-            showToastr('warning', '压缩正在进行中，请稍后再总结。');
+            lastSummaryErrorMessage = '压缩正在进行中，请稍后再总结。';
+            showToastr('warning', lastSummaryErrorMessage);
             return false;
         }
         if (!$popupInstance && !$statusMessageSpan) { /* Allow proceeding */ }
          if (!currentChatFileIdentifier || currentChatFileIdentifier.startsWith('unknown_chat')) {
-            showToastr("error", "无法确定当前聊天，无法为总结条目生成准确名称。请尝试重新打开总结工具或刷新页面。");
+            lastSummaryErrorMessage = "无法确定当前聊天，无法保存总结。请尝试重新打开总结工具或刷新页面。";
+            showToastr("error", lastSummaryErrorMessage);
             if($statusMessageSpan) $statusMessageSpan.text("错误：无法确定当前聊天。");
             return false;
         }
@@ -5266,10 +5423,7 @@ let activePopupHandle = null;
                     logDebug('[存储层] 总结已写入 chat_metadata，楼层:', startInternalId, '-', endInternalId);
                     showToastr('success', floorRangeText + ' 的总结已写入记忆并注入。');
                 } else {
-                    // 写入失败：降级到世界书，不丢数据
-                    logError('[存储层] 写入 chat_metadata 失败，降级到世界书模式。');
-                    showToastr('warning', '记忆写入失败，本次改用世界书。');
-                    currentStorageMode = STORAGE_MODE_LOREBOOK;
+                    throw new Error('注入式记忆写入失败，本次总结没有保存。');
                 }
             }
 
@@ -5322,7 +5476,7 @@ let activePopupHandle = null;
                         await manageSummaryLorebookEntries();
                     } else { throw new Error("创建世界书条目后未返回有效的UID。"); }
                 }
-            } else {
+            } else if (currentStorageMode === STORAGE_MODE_LOREBOOK) {
                 logWarn(`摘要 (${floorRangeText}) 未上传。${!currentPrimaryLorebook ? "原因：未设置主世界书。" : ""}`);
                 if(shouldUploadToLorebook) showToastr("warning",`未找到主世界书，摘要 (${floorRangeText}) 未上传。`);
                 // If not uploading, finalContentForLorebook would be just summaryText or INTRO + summaryText if it were a "new" local summary.
@@ -5359,8 +5513,9 @@ let activePopupHandle = null;
             return true;
         } catch (error) {
             logError(`总结或上传过程中发生错误 (${floorRangeText}): ${error.message}`); console.error(error);
+            lastSummaryErrorMessage = error && error.message ? error.message : String(error);
             const errorMsg = `错误：总结失败 (${floorRangeText})。`;
-            showToastr("error", `总结失败 (${floorRangeText}): ${error.message}`);
+            showToastr("error", `总结失败 (${floorRangeText}): ${lastSummaryErrorMessage}`);
             if($statusMessageSpan) $statusMessageSpan.text(errorMsg);
             return false;
         }
