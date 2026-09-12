@@ -2136,15 +2136,21 @@ let activePopupHandle = null;
 
     async function confirmCompat(message, title = '确认') {
         if (SillyTavern_API?.callGenericPopup && SillyTavern_API?.POPUP_TYPE) {
-            return await new Promise(resolve => {
-                SillyTavern_API.callGenericPopup(message, SillyTavern_API.POPUP_TYPE.CONFIRM, title, {
-                    buttons: [
-                        { label: "继续", value: true, isAffirmative: true },
-                        { label: "取消", value: false, isNegative: true },
-                    ],
-                    callback: (action) => resolve(action === true),
-                });
-            });
+            try {
+                const result = await SillyTavern_API.callGenericPopup(
+                    message,
+                    SillyTavern_API.POPUP_TYPE.CONFIRM,
+                    null,
+                    {
+                        okButton: "继续",
+                        cancelButton: "取消",
+                    }
+                );
+                if (POPUP_RESULT_API?.AFFIRMATIVE !== undefined) return result === POPUP_RESULT_API.AFFIRMATIVE;
+                return result === true || result === 1 || result === 'ok' || result === 'confirm' || result === 'affirmative';
+            } catch (error) {
+                logError('确认弹窗失败，尝试兼容弹窗:', error);
+            }
         }
         if (Popup_API?.show?.confirm) {
             try {
@@ -2576,7 +2582,7 @@ let activePopupHandle = null;
                     flex: none; font-family: var(--ff-num); color: var(--text);
                 }
                 #${POPUP_ID} .bulk-progress-track {
-                    height: 8px; overflow: hidden;
+                    position: relative; height: 8px; overflow: hidden;
                     background: var(--surface-2);
                     border-radius: 999px;
                 }
@@ -2586,11 +2592,28 @@ let activePopupHandle = null;
                     border-radius: inherit;
                     transition: width 0.25s ease;
                 }
+                #${POPUP_ID} .bulk-progress-panel[data-state="streaming"] .bulk-progress-track::after {
+                    content: ""; position: absolute; inset: 0 auto 0 -38%; width: 38%;
+                    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+                    animation: knotted-stream-progress 1.1s ease-in-out infinite;
+                }
+                @keyframes knotted-stream-progress {
+                    from { left: -38%; }
+                    to { left: 100%; }
+                }
                 #${POPUP_ID} .bulk-progress-detail {
                     margin-top: 8px; font-size: 11.5px;
                     line-height: 1.55; color: var(--faint);
                     overflow-wrap: anywhere;
                 }
+                #${POPUP_ID} .bulk-progress-stream {
+                    margin-top: 8px; padding: 8px 9px; max-height: 90px; overflow-y: auto;
+                    border: 1px solid var(--line-soft); border-radius: var(--r-xs);
+                    background: var(--surface-2); color: var(--dim);
+                    font-size: 11px; line-height: 1.55; white-space: pre-wrap;
+                    overflow-wrap: anywhere;
+                }
+                #${POPUP_ID} .bulk-progress-stream[hidden] { display: none !important; }
                 #${POPUP_ID} .bulk-progress-panel[data-state="success"] .bulk-progress-fill { background: var(--ok); }
                 #${POPUP_ID} .bulk-progress-panel[data-state="error"] {
                     border-color: var(--warn);
@@ -3142,6 +3165,7 @@ let activePopupHandle = null;
                                     <div id="${SCRIPT_ID_PREFIX}-bulk-progress-fill" class="bulk-progress-fill"></div>
                                 </div>
                                 <div id="${SCRIPT_ID_PREFIX}-bulk-progress-detail" class="bulk-progress-detail"></div>
+                                <div id="${SCRIPT_ID_PREFIX}-bulk-progress-stream" class="bulk-progress-stream" hidden></div>
                             </div>
                         </div>
                     </div>
@@ -4114,6 +4138,25 @@ let activePopupHandle = null;
         $popupInstance.find(`#${SCRIPT_ID_PREFIX}-bulk-progress-fill`).css('width', percent + '%');
         $popupInstance.find(`#${SCRIPT_ID_PREFIX}-bulk-progress-detail`).text(detail || '');
         $popupInstance.find(`#${SCRIPT_ID_PREFIX}-bulk-progress-track`).attr('aria-valuenow', percent);
+        if (state !== 'streaming') {
+            $popupInstance.find(`#${SCRIPT_ID_PREFIX}-bulk-progress-stream`).prop('hidden', true).text('');
+        }
+    }
+
+    function updateBulkStreamProgress(completed, total, round, partialText) {
+        var text = typeof partialText === 'string' ? partialText : '';
+        updateBulkProgress(
+            'streaming',
+            completed,
+            total,
+            `正在进行第 ${round} / ${total} 轮`,
+            text ? `模型正在流式生成，已接收 ${text.length} 字。` : '请求已发送，正在等待模型返回第一个片段…'
+        );
+        if (!$popupInstance) return;
+        var $stream = $popupInstance.find(`#${SCRIPT_ID_PREFIX}-bulk-progress-stream`);
+        if (!$stream.length) return;
+        $stream.prop('hidden', false).text(text ? text.slice(-600) : '等待模型响应…');
+        if ($stream[0]) $stream.scrollTop($stream[0].scrollHeight);
     }
 
     //【90修改】手动执行自动总结的逻辑
@@ -4279,11 +4322,21 @@ let activePopupHandle = null;
                 logDebug(`自动总结循环：准备处理区块 (未总结 ${unsummarizedCount} >= 阈值 ${triggerThreshold})。当前 nextChunkStartFloor (0-based): ${nextChunkStartFloor}, 区块大小: ${effectiveChunkSize}`);
                 const currentStatusText = `正在总结 ${nextChunkStartFloor + 1} 至 ${nextChunkStartFloor + effectiveChunkSize} 楼...`;
                 if($statusMessageSpan) $statusMessageSpan.text(currentStatusText); else showToastr("info", currentStatusText);
-                updateBulkProgress('running', completedRounds, totalRounds, `正在进行第 ${completedRounds + 1} / ${totalRounds} 轮`, `${currentStatusText} 已完成 ${completedRounds * effectiveChunkSize} / ${totalFloorsToProcess} 楼。`);
+                updateBulkStreamProgress(completedRounds, totalRounds, completedRounds + 1, '');
                 await new Promise(resolve => setTimeout(resolve, 0));
 
                 lastSummaryErrorMessage = '';
-                const success = await summarizeAndUploadChunk(nextChunkStartFloor, nextChunkStartFloor + effectiveChunkSize - 1);
+                var lastStreamUiUpdate = 0;
+                const success = await summarizeAndUploadChunk(
+                    nextChunkStartFloor,
+                    nextChunkStartFloor + effectiveChunkSize - 1,
+                    function (partialText) {
+                        var now = Date.now();
+                        if (now - lastStreamUiUpdate < 80) return;
+                        lastStreamUiUpdate = now;
+                        updateBulkStreamProgress(completedRounds, totalRounds, completedRounds + 1, partialText);
+                    }
+                );
                  if (!success) {
                     throw new Error(lastSummaryErrorMessage || `区块 ${nextChunkStartFloor + 1}-${nextChunkStartFloor + effectiveChunkSize} 总结失败。`);
                 }
@@ -4319,7 +4372,7 @@ let activePopupHandle = null;
             if($autoSummarizeButton) $autoSummarizeButton.prop('disabled', false).text("立即执行");
         }
     }
-    async function summarizeAndUploadChunk(startInternalId, endInternalId) { /* ... (no change) ... */
+    async function summarizeAndUploadChunk(startInternalId, endInternalId, onStreamUpdate) { /* ... (no change) ... */
         lastSummaryErrorMessage = '';
         if (!coreApisAreReady) {
             lastSummaryErrorMessage = "核心API未就绪，无法总结。";
@@ -4355,7 +4408,7 @@ let activePopupHandle = null;
              if($statusMessageSpan) $statusMessageSpan.text("总结操作已取消。");
             return false;
         }
-        return await proceedWithSummarization(startInternalId, endInternalId, (currentStorageMode === STORAGE_MODE_LOREBOOK && proceedToUpload && !!currentPrimaryLorebook) );
+        return await proceedWithSummarization(startInternalId, endInternalId, (currentStorageMode === STORAGE_MODE_LOREBOOK && proceedToUpload && !!currentPrimaryLorebook), onStreamUpdate );
     }
     async function manageSummaryLorebookEntries() {
         if (!currentPrimaryLorebook || !TavernHelper_API?.getLorebookEntries || !TavernHelper_API?.setLorebookEntries) {
@@ -5327,7 +5380,7 @@ let activePopupHandle = null;
     // ===== 压缩功能结束 =====
 
     // 【90修改】调用自定义OpenAI API的函数及报错
-    async function callCustomOpenAI(systemMsgContent, userPromptContent) { /* ... (no change) ... */
+    async function callCustomOpenAI(systemMsgContent, userPromptContent, onStreamUpdate) { /* ... (no change) ... */
         syncCustomApiConfigFromActiveProfile();
         if (!customApiConfig.url || !customApiConfig.model) {
             throw new Error("自定义API URL或模型未配置。");
@@ -5353,27 +5406,110 @@ let activePopupHandle = null;
         const body = JSON.stringify({
             model: customApiConfig.model,
             messages: [ { role: "system", content: combinedSystemPrompt }, { role: "user", content: userPromptContent } ],
-            stream: false, // Explicitly disable streaming
+            stream: true,
         });
         logDebug("调用自定义API:", fullApiUrl, "模型:", customApiConfig.model, "附带头部信息:", headers);
         // logDebug("Combined System Prompt for API call:\n", combinedSystemPrompt); // For debugging combined prompt
-        const response = await fetch(fullApiUrl, { method: 'POST', headers: headers, body: body });
+        let response = await fetch(fullApiUrl, { method: 'POST', headers: headers, body: body });
         if (!response.ok) {
             const errorText = await response.text();
-            logError("自定义API调用失败:", response.status, response.statusText, errorText);
-            throw new Error(`自定义API请求失败: ${response.status} ${response.statusText}. 详情: ${errorText}`);
+            const canRetryWithoutStream = [400, 404, 422].includes(response.status) && /stream/i.test(errorText);
+            if (canRetryWithoutStream) {
+                logWarn('当前API不支持流式总结，已自动改用普通响应。');
+                const fallbackBody = JSON.stringify({
+                    model: customApiConfig.model,
+                    messages: [ { role: "system", content: combinedSystemPrompt }, { role: "user", content: userPromptContent } ],
+                    stream: false,
+                });
+                response = await fetch(fullApiUrl, { method: 'POST', headers: headers, body: fallbackBody });
+                if (!response.ok) {
+                    const fallbackErrorText = await response.text();
+                    logError("自定义API调用失败:", response.status, response.statusText, fallbackErrorText);
+                    throw new Error(`自定义API请求失败: ${response.status} ${response.statusText}. 详情: ${fallbackErrorText}`);
+                }
+            } else {
+                logError("自定义API调用失败:", response.status, response.statusText, errorText);
+                throw new Error(`自定义API请求失败: ${response.status} ${response.statusText}. 详情: ${errorText}`);
+            }
         }
-        const data = await response.json();
-        logDebug("自定义API响应:", data);
-        if (data.choices && data.choices.length > 0 && data.choices[0].message && data.choices[0].message.content) {
-            return data.choices[0].message.content.trim();
-        } else {
-            logError("自定义API响应格式不正确或无内容:", data);
-            throw new Error("自定义API响应格式不正确或未返回内容。");
+        function normalizeContent(value) {
+            if (typeof value === 'string') return value;
+            if (!Array.isArray(value)) return '';
+            return value.map(function (item) {
+                if (typeof item === 'string') return item;
+                if (item && typeof item.text === 'string') return item.text;
+                if (item && typeof item.content === 'string') return item.content;
+                return '';
+            }).join('');
         }
+        function extractContent(data, streaming) {
+            if (!data || !Array.isArray(data.choices) || data.choices.length === 0) return '';
+            var choice = data.choices[0] || {};
+            if (streaming && choice.delta) return normalizeContent(choice.delta.content);
+            if (choice.message) return normalizeContent(choice.message.content);
+            return normalizeContent(choice.text);
+        }
+
+        const contentType = (response.headers.get('content-type') || '').toLowerCase();
+        if (!response.body || typeof response.body.getReader !== 'function' || contentType.includes('application/json')) {
+            const data = await response.json();
+            const content = extractContent(data, false);
+            if (!content) {
+                logError("自定义API响应格式不正确或无内容:", data);
+                throw new Error("自定义API响应格式不正确或未返回内容。");
+            }
+            if (typeof onStreamUpdate === 'function') onStreamUpdate(content, content);
+            return content.trim();
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        let streamedContent = '';
+        let streamDone = false;
+
+        function consumeStreamLine(rawLine) {
+            var line = rawLine.trim();
+            if (!line || line.charAt(0) === ':' || line.indexOf('event:') === 0) return;
+            if (line.indexOf('data:') === 0) line = line.slice(5).trim();
+            if (!line) return;
+            if (line === '[DONE]') {
+                streamDone = true;
+                return;
+            }
+            var data;
+            try {
+                data = JSON.parse(line);
+            } catch (e) {
+                return;
+            }
+            if (data && data.error) {
+                var streamError = data.error.message || data.error.type || JSON.stringify(data.error);
+                throw new Error('API流式响应报错: ' + streamError);
+            }
+            var delta = extractContent(data, true) || extractContent(data, false);
+            if (!delta) return;
+            streamedContent += delta;
+            if (typeof onStreamUpdate === 'function') onStreamUpdate(streamedContent, delta);
+        }
+
+        while (!streamDone) {
+            const chunk = await reader.read();
+            if (chunk.done) break;
+            buffer += decoder.decode(chunk.value, { stream: true });
+            var lines = buffer.split(/\r?\n/);
+            buffer = lines.pop() || '';
+            for (var i = 0; i < lines.length; i++) consumeStreamLine(lines[i]);
+        }
+        buffer += decoder.decode();
+        if (buffer.trim() && !streamDone) consumeStreamLine(buffer);
+        if (!streamedContent.trim()) {
+            throw new Error('API流式响应已结束，但没有返回可用的总结内容。');
+        }
+        return streamedContent.trim();
     }
 
-    async function proceedWithSummarization(startInternalId, endInternalId, shouldUploadToLorebook) { /* ... (no change) ... */
+    async function proceedWithSummarization(startInternalId, endInternalId, shouldUploadToLorebook, onStreamUpdate) { /* ... (no change) ... */
         if (isCompressing) {
             lastSummaryErrorMessage = '压缩正在进行中，请稍后再总结。';
             showToastr('warning', lastSummaryErrorMessage);
@@ -5401,7 +5537,7 @@ let activePopupHandle = null;
         const userPromptForSummarization = `聊天记录上下文如下（请严格对这部分内容进行摘要）：\n\n${chatContextForSummary}\n\n请对以上内容进行摘要：`;
         try {
             // Note: callCustomOpenAI now internally combines currentBreakArmorPrompt and currentSummaryPrompt
-            const summaryText = await callCustomOpenAI(/* systemMsgContent is now handled internally */ null, userPromptForSummarization);
+            const summaryText = await callCustomOpenAI(/* systemMsgContent is now handled internally */ null, userPromptForSummarization, onStreamUpdate);
             if (!summaryText || summaryText.trim() === "") { throw new Error("自定义AI未能生成有效的摘要。"); }
             logDebug(`自定义AI生成的摘要 (${floorRangeText}):\n${summaryText}`);
             if($statusMessageSpan) $statusMessageSpan.text(`摘要已生成 (${floorRangeText})。${shouldUploadToLorebook ? '正在处理世界书条目...' : ''}`);
