@@ -141,6 +141,7 @@ let activePopupHandle = null;
     const STORAGE_KEY_AUTO_COMPRESS = `${SCRIPT_ID_PREFIX}_autoCompress_v1`;
     // 批量总结确认
     const STORAGE_KEY_BULK_CONFIRM = `${SCRIPT_ID_PREFIX}_bulkConfirm_v1`;
+    const STORAGE_KEY_STREAM_SUMMARY = `${SCRIPT_ID_PREFIX}_streamSummary_v1`;
     const BULK_CONFIRM_ROUNDS = 5;   // 预计轮数超过这个值才弹确认框
 
     const DEFAULT_FRESH_COUNT = 3;
@@ -244,6 +245,7 @@ let activePopupHandle = null;
     let isCompressing = false;   // 互斥锁
     let autoCompressEnabled = true;
     let bulkConfirmEnabled = true;
+    let streamSummaryEnabled = true;
     // 本次会话内已确认过，不再重复询问。切换聊天时重置。
     let bulkConfirmedThisSession = false;
 
@@ -937,6 +939,9 @@ let activePopupHandle = null;
 
         var savedBc = localStorage.getItem(STORAGE_KEY_BULK_CONFIRM);
         bulkConfirmEnabled = (savedBc === 'false') ? false : true;
+
+        var savedStreamSummary = localStorage.getItem(STORAGE_KEY_STREAM_SUMMARY);
+        streamSummaryEnabled = (savedStreamSummary === 'false') ? false : true;
         logDebug('[存储层] 当前模式:', currentStorageMode, '注入深度:', currentInjectDepth);
 
         try {
@@ -2799,6 +2804,10 @@ let activePopupHandle = null;
                                         <button id="${SCRIPT_ID_PREFIX}-load-models" class="button button-subtle flex-shrink-0">加载模型</button>
                                     </div>
                                 </div>
+                                <div class="checkbox-group">
+                                    <input type="checkbox" id="${SCRIPT_ID_PREFIX}-stream-summary-checkbox">
+                                    <label for="${SCRIPT_ID_PREFIX}-stream-summary-checkbox">启用流式总结</label>
+                                </div>
                                 <div class="button-group">
                                     <button id="${SCRIPT_ID_PREFIX}-clear-config" class="button button-secondary">清除配置</button>
                                     <button id="${SCRIPT_ID_PREFIX}-save-config" class="button button-primary">保存配置</button>
@@ -3493,6 +3502,17 @@ let activePopupHandle = null;
                     $bc.on('change', function () {
                         bulkConfirmEnabled = jQuery_API(this).is(':checked');
                         localStorage.setItem(STORAGE_KEY_BULK_CONFIRM, bulkConfirmEnabled ? 'true' : 'false');
+                    });
+                }
+            })();
+            (function () {
+                var $streamSummary = jQuery_API('#' + SCRIPT_ID_PREFIX + '-stream-summary-checkbox');
+                if ($streamSummary.length) {
+                    $streamSummary.prop('checked', streamSummaryEnabled);
+                    $streamSummary.on('change', function () {
+                        streamSummaryEnabled = jQuery_API(this).is(':checked');
+                        localStorage.setItem(STORAGE_KEY_STREAM_SUMMARY, streamSummaryEnabled ? 'true' : 'false');
+                        showToastr('info', streamSummaryEnabled ? '已启用流式总结。' : '已切换为非流式总结。');
                     });
                 }
             })();
@@ -4322,7 +4342,12 @@ let activePopupHandle = null;
                 logDebug(`自动总结循环：准备处理区块 (未总结 ${unsummarizedCount} >= 阈值 ${triggerThreshold})。当前 nextChunkStartFloor (0-based): ${nextChunkStartFloor}, 区块大小: ${effectiveChunkSize}`);
                 const currentStatusText = `正在总结 ${nextChunkStartFloor + 1} 至 ${nextChunkStartFloor + effectiveChunkSize} 楼...`;
                 if($statusMessageSpan) $statusMessageSpan.text(currentStatusText); else showToastr("info", currentStatusText);
-                updateBulkStreamProgress(completedRounds, totalRounds, completedRounds + 1, '');
+                var useStreamingForRound = streamSummaryEnabled;
+                if (useStreamingForRound) {
+                    updateBulkStreamProgress(completedRounds, totalRounds, completedRounds + 1, '');
+                } else {
+                    updateBulkProgress('running', completedRounds, totalRounds, `正在进行第 ${completedRounds + 1} / ${totalRounds} 轮`, '非流式模式：请求已发送，正在等待完整响应…');
+                }
                 await new Promise(resolve => setTimeout(resolve, 0));
 
                 lastSummaryErrorMessage = '';
@@ -4330,12 +4355,12 @@ let activePopupHandle = null;
                 const success = await summarizeAndUploadChunk(
                     nextChunkStartFloor,
                     nextChunkStartFloor + effectiveChunkSize - 1,
-                    function (partialText) {
+                    useStreamingForRound ? function (partialText) {
                         var now = Date.now();
                         if (now - lastStreamUiUpdate < 80) return;
                         lastStreamUiUpdate = now;
                         updateBulkStreamProgress(completedRounds, totalRounds, completedRounds + 1, partialText);
-                    }
+                    } : null
                 );
                  if (!success) {
                     throw new Error(lastSummaryErrorMessage || `区块 ${nextChunkStartFloor + 1}-${nextChunkStartFloor + effectiveChunkSize} 总结失败。`);
@@ -5403,17 +5428,18 @@ let activePopupHandle = null;
 
         const headers = { 'Content-Type': 'application/json' };
         if (customApiConfig.apiKey) { headers['Authorization'] = `Bearer ${customApiConfig.apiKey}`; }
+        const useStreaming = streamSummaryEnabled;
         const body = JSON.stringify({
             model: customApiConfig.model,
             messages: [ { role: "system", content: combinedSystemPrompt }, { role: "user", content: userPromptContent } ],
-            stream: true,
+            stream: useStreaming,
         });
         logDebug("调用自定义API:", fullApiUrl, "模型:", customApiConfig.model, "附带头部信息:", headers);
         // logDebug("Combined System Prompt for API call:\n", combinedSystemPrompt); // For debugging combined prompt
         let response = await fetch(fullApiUrl, { method: 'POST', headers: headers, body: body });
         if (!response.ok) {
             const errorText = await response.text();
-            const canRetryWithoutStream = [400, 404, 422].includes(response.status) && /stream/i.test(errorText);
+            const canRetryWithoutStream = useStreaming && [400, 404, 422].includes(response.status) && /stream/i.test(errorText);
             if (canRetryWithoutStream) {
                 logWarn('当前API不支持流式总结，已自动改用普通响应。');
                 const fallbackBody = JSON.stringify({
